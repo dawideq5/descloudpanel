@@ -130,3 +130,48 @@ function send_email(string $to, string $subject, string $body): bool {
     $mailer->send();
     return true; // Jeśli kod doszedł do tego miejsca, wysłano pomyślnie.
 }
+
+/**
+ * Pobiera nazwę wyświetlaną użytkownika.
+ * Preferuje imię i nazwisko, a jeśli ich nie ma, używa nazwy użytkownika.
+ *
+ * @return string
+ */
+function get_display_name(): string {
+    if (!empty($_SESSION['first_name']) && !empty($_SESSION['last_name'])) {
+        return htmlspecialchars($_SESSION['first_name'] . ' ' . $_SESSION['last_name']);
+    }
+
+    return htmlspecialchars($_SESSION['username'] ?? 'Użytkownik');
+}
+
+/**
+ * Generuje unikalną nazwę użytkownika na podstawie imienia i nazwiska.
+ * Format: (3 litery imienia)(3 litery nazwiska)_(numer)
+ *
+ * @param string $first_name
+ * @param string $last_name
+ * @return string
+ */
+function generate_username(string $first_name, string $last_name): string {
+    global $pdo;
+
+    // Usunięcie polskich znaków
+    $first_name = iconv('UTF-8', 'ASCII//TRANSLIT', $first_name);
+    $last_name = iconv('UTF-8', 'ASCII//TRANSLIT', $last_name);
+
+    $base = strtolower(substr($first_name, 0, 3) . substr($last_name, 0, 3));
+    $username = $base . '_1';
+    $counter = 1;
+
+    // Pętla sprawdzająca unikalność
+    while (true) {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
+        $stmt->execute([$username]);
+        if ($stmt->fetchColumn() == 0) {
+            return $username;
+        }
+        $counter++;
+        $username = $base . '_' . $counter;
+    }
+}

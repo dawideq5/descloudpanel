@@ -20,10 +20,6 @@ if (empty($password_current) || empty($password_new) || empty($password_confirm)
     redirect('/settings?tab=password');
 }
 
-if (strlen($password_new) < 10) {
-    $_SESSION['error_message'] = 'Nowe hasło musi mieć co najmniej 10 znaków.';
-    redirect('/settings?tab=password');
-}
 
 if ($password_new !== $password_confirm) {
     $_SESSION['error_message'] = 'Nowe hasła nie są identyczne.';

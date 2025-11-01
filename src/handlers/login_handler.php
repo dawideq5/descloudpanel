@@ -23,8 +23,8 @@ try {
 
     // === POPRAWKA KRTYTYCZNA: Używamy kolumny 'email' do logowania i poprawnie wybieramy 'password_hash' ===
     // Wcześniejsze: "SELECT id, password AS password_hash, user_type_id, mfa_totp_enabled, mfa_email_enabled FROM users WHERE email = ?"
-    $stmt = $pdo->prepare("SELECT id, password_hash, user_type_id, mfa_totp_enabled, mfa_email_enabled FROM users WHERE email = ?");
-    $stmt->execute([$username]);
+    $stmt = $pdo->prepare("SELECT id, password_hash, user_type_id, mfa_totp_enabled, mfa_email_enabled, first_name, last_name FROM users WHERE username = :login OR email = :login OR phone_number = :login");
+    $stmt->execute(['login' => $username]);
     $user = $stmt->fetch();
     // Hasło jest teraz dostępne pod kluczem `$user['password_hash']`, tak jak oczekuje reszta kodu.
 
@@ -57,6 +57,8 @@ try {
             $_SESSION['mfa_pending_user_id'] = $user['id'];
             $_SESSION['mfa_pending_username'] = $username;
             $_SESSION['mfa_pending_user_type_id'] = $user['user_type_id'];
+            $_SESSION['first_name'] = $user['first_name'];
+            $_SESSION['last_name'] = $user['last_name'];
             $_SESSION['mfa_action_required'] = 'login'; // Cel: logowanie
             $_SESSION['mfa_methods'] = $mfa_methods; // <--- DODANIE DO SESJI
             
@@ -81,6 +83,8 @@ try {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
             $_SESSION['user_type_id'] = $user['user_type_id'];
+            $_SESSION['first_name'] = $user['first_name'];
+            $_SESSION['last_name'] = $user['last_name'];
             $_SESSION['session_token'] = $session_token;
             unset($_SESSION['permissions']); 
 

@@ -70,7 +70,7 @@
         <div class="dropdown">
             <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-person-circle me-2"></i>
-                <strong><?php echo htmlspecialchars($_SESSION['username'] ?? 'Użytkownik'); ?></strong>
+                <strong><?php echo get_display_name(); ?></strong>
             </a>
             <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser1">
                 <li><a class="dropdown-item" href="/settings">Ustawienia</a></li>

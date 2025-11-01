@@ -22,33 +22,51 @@ if (!$user) {
     <h1 class="h2">Ustawienia konta</h1>
 </div>
 
-<div class="row">
-    <div class="col-md-3">
-        <div class="list-group">
-            <a href="/settings?tab=profile" class="list-group-item list-group-item-action <?php echo ($active_tab === 'profile') ? 'active' : ''; ?>">
-                <i class="bi bi-person-circle me-2"></i> Profil
-            </a>
-            <a href="/settings?tab=password" class="list-group-item list-group-item-action <?php echo ($active_tab === 'password') ? 'active' : ''; ?>">
-                <i class="bi bi-lock-fill me-2"></i> Hasło
-            </a>
-            <a href="/settings?tab=mfa" class="list-group-item list-group-item-action <?php echo ($active_tab === 'mfa') ? 'active' : ''; ?>">
-                <i class="bi bi-shield-lock me-2"></i> Weryfikacja dwuetapowa
-            </a>
-            </div>
+<div class="card">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs">
+            <li class="nav-item">
+                <a class="nav-link <?php echo ($active_tab === 'profile') ? 'active' : ''; ?>" href="/settings?tab=profile">
+                    <i class="bi bi-person-circle me-1"></i> Profil
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?php echo ($active_tab === 'avatar') ? 'active' : ''; ?>" href="/settings?tab=avatar">
+                    <i class="bi bi-image me-1"></i> Zdjęcie profilowe
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?php echo ($active_tab === 'password') ? 'active' : ''; ?>" href="/settings?tab=password">
+                    <i class="bi bi-lock-fill me-1"></i> Hasło
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?php echo ($active_tab === 'mfa') ? 'active' : ''; ?>" href="/settings?tab=mfa">
+                    <i class="bi bi-shield-lock me-1"></i> Weryfikacja dwuetapowa
+                </a>
+            </li>
+        </ul>
     </div>
-    <div class="col-md-9">
-        <?php if ($active_tab === 'profile'): ?>
-            <?php require __DIR__ . '/partials/settings/_profile.php'; ?>
-        <?php elseif ($active_tab === 'password'): ?>
-            <?php require __DIR__ . '/partials/settings/_password.php'; ?>
-        <?php elseif ($active_tab === 'mfa'): ?>
-            <?php require __DIR__ . '/partials/settings/_mfa.php'; ?>
-        <?php elseif ($active_tab === 'email'): ?>
-            <div class="alert alert-warning">Ta zakładka została przeniesiona do sekcji Profil.</div>
-            <?php require __DIR__ . '/partials/settings/_email.php'; ?> 
-        <?php else: ?>
-            <?php require __DIR__ . '/partials/settings/_profile.php'; ?>
-        <?php endif; ?>
+    <div class="card-body">
+        <?php
+        switch ($active_tab) {
+            case 'profile':
+                require __DIR__ . '/partials/settings/_profile.php';
+                break;
+            case 'avatar':
+                require __DIR__ . '/partials/settings/_avatar.php';
+                break;
+            case 'password':
+                require __DIR__ . '/partials/settings/_password.php';
+                break;
+            case 'mfa':
+                require __DIR__ . '/partials/settings/_mfa.php';
+                break;
+            default:
+                require __DIR__ . '/partials/settings/_profile.php';
+                break;
+        }
+        ?>
     </div>
 </div>
 
