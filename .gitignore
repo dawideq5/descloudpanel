@@ -1,0 +1,15 @@
+# Pliki konfiguracyjne
+.env
+
+# Pliki zależności
+vendor/
+
+# Pliki logów
+*.log
+
+# Pliki tymczasowe
+storage/sessions/*
+storage/avatars/*
+
+# Pliki binarne
+composer.phar

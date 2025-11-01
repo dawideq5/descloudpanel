@@ -1,74 +1,62 @@
 <?php
 // Plik: /src/handlers/settings_password_request.php
+// Wersja 2 - Używa szablonu e-mail i 15-minutowego czasu wygaśnięcia
+
 // Publiczny, nie wymaga logowania
-
-// === POPRAWKA ŚCIEŻKI ===
-// Ten plik jest publiczny, musi ładować własne zależności.
 require_once __DIR__ . '/../../config/boot.php';
+require_once __DIR__ . '/../functions.php'; // Potrzebujemy send_templated_email
 
-// === ZMIANA: Uruchomienie sesji dla add_log() i komunikatów ===
 session_start();
-
 global $pdo;
 
 $email = $_POST['email'] ?? null;
-// $password_current = $_POST['password_current'] ?? null; // Usunięte zgodnie z prośbą
 
-if (empty($email)) {
-    $_SESSION['error_message'] = 'Musisz podać adres e-mail.';
+if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $_SESSION['error_message'] = 'Musisz podać prawidłowy adres e-mail.';
     redirect('/reset_password');
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, email, password_hash FROM users WHERE email = ?");
+    $stmt = $pdo->prepare("SELECT id, email FROM users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
-    if (!$user) {
-        // Taki sam komunikat jak przy sukcesie, aby nie ujawniać, czy e-mail istnieje
-        $_SESSION['success_message'] = 'Jeśli konto o podanym adresie e-mail istnieje, wysłaliśmy na nie link do resetowania hasła.';
-        redirect('/reset_password');
-    }
+    if ($user) {
+        // Generuj token i ustaw czas wygaśnięcia na 15 minut
+        $token = bin2hex(random_bytes(32));
+        $expires = date('Y-m-d H:i:s', time() + 900); // 15 minut
 
-    // === ZMIANA: USUNIĘTO BLOK WERYFIKACJI OBECNEGO HASŁA ===
-    // Logika weryfikacji hasła została usunięta zgodnie z prośbą.
+        $stmt_token = $pdo->prepare("UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?");
+        $stmt_token->execute([$token, $expires, $user['id']]);
 
-    // Wygeneruj token
-    $token = bin2hex(random_bytes(32));
-    $expires = date('Y-m-d H:i:s', time() + 3600); // Ważny 1 godzinę
+        // Wyślij e-mail przy użyciu szablonu
+        $reset_link = APP_URL . '/reset_password?token=' . $token;
+        $subject = 'Resetowanie hasła';
 
-    $stmt_token = $pdo->prepare("UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?");
-    $stmt_token->execute([$token, $expires, $user['id']]);
+        $message = "Otrzymaliśmy prośbę o zresetowanie hasła dla Twojego konta.<br><br>" .
+                   "Kliknij poniższy przycisk, aby ustawić nowe hasło. Link jest ważny przez 15 minut.";
 
-    // Wyślij e-mail
-    $reset_link = APP_URL . '/reset_password?token=' . $token;
-    
-    $subject = 'Resetowanie hasła';
-    $body = "Otrzymaliśmy prośbę o zresetowanie hasła dla Twojego konta.<br><br>" .
-            "Kliknij poniższy link, aby ustawić nowe hasło:<br>" .
-            "<a href='{$reset_link}'>{$reset_link}</a><br><br>" .
-            "Jeśli to nie Ty prosiłeś o zmianę, zignoruj tę wiadomość.<br>" .
-            "Link wygaśnie za 1 godzinę.";
+        $button_html = '<a href="' . $reset_link . '" class="button">Zresetuj hasło</a>';
 
-    if (!send_email($user['email'], $subject, $body)) {
-        throw new Exception('Nie udało się wysłać e-maila do resetowania hasła. Spróbuj ponownie.');
+        send_templated_email($user['email'], $subject, $message, $button_html);
+
+        add_log('PASSWORD_RESET_REQUEST', "Wysłano link do resetowania hasła dla {$email}.", 'INFO', $user['id']);
     }
     
-    // Potrzebujemy funkcji redirect(), która jest w auth.php.
-    // auth.php ładuje functions.php, więc add_log też zadziała.
-    require_once __DIR__ . '/../auth.php';
-    add_log('PASSWORD_RESET_REQUEST', "Wysłano link do resetowania hasła dla {$email}.", 'INFO', $user['id']);
-    
+    // Zawsze pokazuj ten sam komunikat, aby nie ujawniać istnienia konta
     $_SESSION['success_message'] = 'Jeśli konto o podanym adresie e-mail istnieje, wysłaliśmy na nie link do resetowania hasła.';
     redirect('/reset_password');
 
 } catch (Exception $e) {
     error_log("Błąd wysyłania resetu hasła: " . $e->getMessage());
-    $_SESSION['error_message'] = 'Wystąpił błąd serwera podczas próby wysłania wiadomości e-mail.';
-    
-    // Musimy załadować auth.php, aby użyć redirect() w razie błędu
-    if (!function_exists('redirect')) {
-        require_once __DIR__ . '/../auth.php';
-    }
+    $_SESSION['error_message'] = 'Wystąpił błąd serwera. Spróbuj ponownie później.';
     redirect('/reset_password');
+}
+
+// Funkcja redirect musi być dostępna
+if (!function_exists('redirect')) {
+    function redirect($url) {
+        header('Location: ' . $url);
+        exit;
+    }
 }

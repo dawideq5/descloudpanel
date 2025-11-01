@@ -1,5 +1,7 @@
 <?php
 // Plik: /src/auth.php
+// Wersja 2 - Usunięto session_write_close() z funkcji redirect()
+
 require_once __DIR__ . '/../config/boot.php';
 
 // Uruchom sesję, jeśli jeszcze nie jest aktywna
@@ -34,8 +36,6 @@ function decrypt(string $data): string {
     return sodium_crypto_aead_aes256gcm_decrypt($ciphertext, $nonce, $nonce, $key);
 }
 
-// === POPRAWKA KRYTYCZNA: Błędna ścieżka do pliku functions.php ===
-// Było: require_once __DIR__ . '/src/functions.php';
 require_once __DIR__ . '/functions.php';
 
 /**
@@ -43,8 +43,7 @@ require_once __DIR__ . '/functions.php';
  * @param string $url
  */
 function redirect(string $url) {
-    header('Location: ' . $url);
-    session_write_close(); // Zapisz sesję przed przekierowaniem
+    header('Location: '. $url);
     exit;
 }
 
@@ -64,11 +63,18 @@ function is_logged_in(): bool {
     }
 
     // Dodatkowa weryfikacja z bazą danych (dla usunięcia sesji)
-    $stmt = $pdo->prepare("SELECT session_token FROM users WHERE id = ?");
-    $stmt->execute([$_SESSION['user_id']]);
-    $db_token = $stmt->fetchColumn();
+    try {
+        $stmt = $pdo->prepare("SELECT session_token FROM users WHERE id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $db_token = $stmt->fetchColumn();
 
-    if ($db_token === null || $db_token !== $_SESSION['session_token']) {
+        if ($db_token === false || $db_token !== $_SESSION['session_token']) {
+            session_destroy();
+            return false;
+        }
+    } catch (PDOException $e) {
+        // W przypadku błędu bazy danych, lepiej wylogować
+        error_log("Błąd weryfikacji sesji: " . $e->getMessage());
         session_destroy();
         return false;
     }

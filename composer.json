@@ -2,6 +2,7 @@
     "require": {
         "phpmailer/phpmailer": "^6.9",
         "robthree/twofactorauth": "^2.1",
-        "web-auth/webauthn-lib": "^4.0"
+        "web-auth/webauthn-lib": "^4.0",
+        "vlucas/phpdotenv": "^5.5"
     }
 }

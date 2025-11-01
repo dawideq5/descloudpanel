@@ -1,25 +1,26 @@
 <?php
 // Plik: /src/handlers/settings_profile_handler.php
+// Wersja 2 - Dostosowano do nowego schematu bazy danych
 
-if (!is_logged_in()) {
-    redirect('/login');
-}
+require_once __DIR__ . '/../auth.php';
+require_login();
 
 global $pdo;
 $user_id = $_SESSION['user_id'];
-$old_username = $_SESSION['username'];
 
-// Odczyt wszystkich pól z formularza
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirect('/settings?tab=profile');
+}
+
+// Odczyt pól z formularza (zgodnie z nowym schematem)
 $first_name = trim($_POST['first_name'] ?? '');
 $last_name = trim($_POST['last_name'] ?? '');
-$phone_private = trim($_POST['phone_private'] ?? '');
-$phone_work = trim($_POST['phone_work'] ?? '');
-$email_work = trim($_POST['email_work'] ?? '');
+$phone_number = trim($_POST['phone_number'] ?? '');
 $new_email = trim($_POST['email'] ?? '');
 
 try {
-    // Pobranie istniejących danych
-    $stmt = $pdo->prepare("SELECT email, `first name`, last_name, phone_private, phone_work, email_work, mfa_email_enabled FROM users WHERE id = ?");
+    // Pobranie istniejących danych użytkownika
+    $stmt = $pdo->prepare("SELECT email, first_name, last_name, phone_number, mfa_email_enabled FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -33,57 +34,29 @@ try {
     $log_details = [];
     
     // Funkcja pomocnicza: Zwraca NULL jeśli pole jest puste, inaczej wartość
-    $set_null_if_empty = function($value) {
-        return $value === '' ? null : $value;
-    };
+    $set_null_if_empty = fn($value) => $value === '' ? null : $value;
     
-    // --- ZMIANY W POLACH PROFILU ---
-    
-    // 1. Pole Imię (first name) - Używamy nazwy kolumny `first name`
-    // 🚨 POPRAWKA: Upewnienie się, że $user['first name'] jest traktowane jako puste, jeśli jest NULL
-    // Logika naśladująca 'last_name':
-    $user_first_name = trim($user['first name'] ?? ''); 
-    if ($first_name !== $user_first_name) {
-        $updates[] = "`first name` = ?"; // Użycie backticków dla nazwy kolumny ze spacją
-        $params[] = $set_null_if_empty($first_name);
-        $log_details[] = "Imię zmienione z '{$user_first_name}' na '{$first_name}'";
+    // --- Porównanie i przygotowanie zmian ---
+
+    if ($first_name !== ($user['first_name'] ?? '')) {
+        $updates[] = "first_name = ?";
+        $params[] = $first_name;
+        $log_details[] = "Imię zmienione z '{$user['first_name']}' na '{$first_name}'";
     }
 
-    // 2. Nazwisko (last_name) - PRZYKŁAD, KTÓRY DZIAŁA
-    $user_last_name = trim($user['last_name'] ?? '');
-    if ($last_name !== $user_last_name) {
+    if ($last_name !== ($user['last_name'] ?? '')) {
         $updates[] = "last_name = ?";
-        $params[] = $set_null_if_empty($last_name);
-        $log_details[] = "Nazwisko zmienione z '{$user_last_name}' na '{$last_name}'";
+        $params[] = $last_name;
+        $log_details[] = "Nazwisko zmienione z '{$user['last_name']}' na '{$last_name}'";
     }
     
-    // ... (pozostały kod pól profilu jest pominięty, ponieważ jest poprawny)
-    
-    // 3. Telefon prywatny (phone_private)
-    $user_phone_private = trim($user['phone_private'] ?? '');
-    if ($phone_private !== $user_phone_private) {
-        $updates[] = "phone_private = ?";
-        $params[] = $set_null_if_empty($phone_private);
-        $log_details[] = "Telefon prywatny zmieniony";
-    }
-
-    // 4. Telefon służbowy (phone_work)
-    $user_phone_work = trim($user['phone_work'] ?? '');
-    if ($phone_work !== $user_phone_work) {
-        $updates[] = "phone_work = ?";
-        $params[] = $set_null_if_empty($phone_work);
-        $log_details[] = "Telefon służbowy zmieniony";
-    }
-
-    // 5. E-mail służbowy (email_work)
-    $user_email_work = trim($user['email_work'] ?? '');
-    if ($email_work !== $user_email_work) {
-        $updates[] = "email_work = ?";
-        $params[] = $set_null_if_empty($email_work);
-        $log_details[] = "E-mail służbowy zmieniony";
+    if ($phone_number !== ($user['phone_number'] ?? '')) {
+        $updates[] = "phone_number = ?";
+        $params[] = $set_null_if_empty($phone_number);
+        $log_details[] = "Numer telefonu zmieniony";
     }
     
-    // --- ZMIANA GŁÓWNEGO E-MAILA ---
+    // --- Zmiana głównego adresu e-mail ---
     if ($new_email !== $old_email) {
         if (!filter_var($new_email, FILTER_VALIDATE_EMAIL)) {
             $_SESSION['error_message'] = 'Nowy adres e-mail jest nieprawidłowy.';
@@ -108,61 +81,31 @@ try {
         }
     }
 
-
-    // --- WYKONANIE AKTUALIZACJI ---
+    // --- Wykonanie aktualizacji ---
     if (!empty($updates)) {
-        
         $sql = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = ?";
         $params[] = $user_id;
-        $stmt_update = $pdo->prepare($sql);
         
-        if (!$stmt_update->execute($params)) {
-              throw new Exception('Błąd zapisu danych do bazy.');
-        }
+        $stmt_update = $pdo->prepare($sql);
+        $stmt_update->execute($params);
 
         $log_message = "Zapisano zmiany w profilu: " . implode('; ', $log_details);
         add_log('SETTINGS_PROFILE_UPDATE', $log_message, 'INFO', $user_id);
         
-        $success_msg = 'Zmiany profilu zostały zapisane.';
-        
-        // 🚨 Wprowadzam poprawki z poprzedniej rundy (dla wyświetlania)
-        if (isset($_SESSION['user'])) {
-              // Używamy klucza 'first_name', aby być spójnym z logiką poniżej i widokami
-              $_SESSION['user']['first_name'] = $set_null_if_empty($first_name); 
-              $_SESSION['user']['last_name'] = $set_null_if_empty($last_name);
-              $_SESSION['user']['phone_private'] = $set_null_if_empty($phone_private);
-              $_SESSION['user']['phone_work'] = $set_null_if_empty($phone_work);
-              $_SESSION['user']['email_work'] = $set_null_if_empty($email_work);
-              unset($_SESSION['user']['first name']); // Usunięcie klucza ze spacją, jeśli istniał
-        }
-        
-        // Aktualizacja zmiennej sesyjnej dla email/login
+        // Aktualizacja danych w sesji, aby były od razu widoczne
+        $_SESSION['first_name'] = $first_name;
+        $_SESSION['last_name'] = $last_name;
         if ($new_email !== $old_email) {
-              $success_msg = 'Adres e-mail został pomyślnie zmieniony.';
-              if (isset($_SESSION['mfa_email_disabled'])) {
-                 $success_msg .= ' Uwierzytelnianie e-mailem zostało wyłączone i wymaga ponownej konfiguracji.';
-                 unset($_SESSION['mfa_email_disabled']);
-              }
-              $_SESSION['username'] = $new_email; 
+            $_SESSION['username'] = $new_email; // 'username' w sesji trzyma główny identyfikator
         }
 
-        // Przeładowanie pełnego obiektu użytkownika do sesji
-        $stmt_reload = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-        $stmt_reload->execute([$user_id]);
-        $reloaded_user = $stmt_reload->fetch(PDO::FETCH_ASSOC);
-
-        if ($reloaded_user) {
-            $reloaded_user['first_name'] = $reloaded_user['first name'] ?? null;
-            unset($reloaded_user['password_hash']);
-            unset($reloaded_user['first name']); // Usunięcie klucza ze spacją
-            $_SESSION['user'] = $reloaded_user;
+        $success_msg = 'Zmiany profilu zostały zapisane.';
+        if (isset($_SESSION['mfa_email_disabled'])) {
+            $success_msg .= ' Uwierzytelnianie e-mailem zostało wyłączone i wymaga ponownej konfiguracji.';
+            unset($_SESSION['mfa_email_disabled']);
         }
-
-
         $_SESSION['success_message'] = $success_msg; 
-
     } else {
-        // Ten blok jest teraz osiągalny tylko wtedy, gdy faktycznie nie ma żadnych zmian
         $_SESSION['error_message'] = 'Nie wprowadzono żadnych zmian.';
     }
 

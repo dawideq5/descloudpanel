@@ -1,5 +1,7 @@
 <?php
 // Plik: /config/mailer.php
+// Wersja 3 - Używa zmiennych środowiskowych
+
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
@@ -10,31 +12,24 @@ function getMailer(): PHPMailer {
         // Konfiguracja serwera
         $mail->isSMTP();
         
-        // TRYB DIAGNOSTYCZNY (zmienimy na 0 po naprawie)
-        $mail->SMTPDebug = 2; 
-        $mail->Debugoutput = 'error_log'; // Dodano, aby logować błędy SMTP do logów serwera
+        $mail->SMTPDebug = 0;
+        $mail->Debugoutput = 'error_log';
         
         $mail->CharSet = 'UTF-8';
         
-        // === POPRAWKA KRTYTYCZNA: Używamy LOCALHOST dla wewnętrznej wysyłki Home.pl ===
-        $mail->Host       = 'localhost';
-        $mail->SMTPAuth   = true; // Wymagane, nawet dla localhosta na Home.pl
+        $mail->Host       = $_ENV['MAILER_HOST'];
+        $mail->SMTPAuth   = true;
         
-        $mail->Username   = 'noreply@descloud.pl'; // Z Pana pliku
-        $mail->Password   = 'Mt5Db4Yu'; // Z Pana pliku
-        // Zabezpieczenie na wypadek, gdyby APP_NAME nie było zdefiniowane
-        $appName = defined('APP_NAME') ? APP_NAME : 'Descloud'; 
-
-        $mail->setFrom('noreply@descloud.pl', $appName); 
+        $mail->Username   = $_ENV['MAILER_USER'];
+        $mail->Password   = $_ENV['MAILER_PASS'];
         
-        $mail->addReplyTo($mail->Username, $appName);
+        $appName = defined('APP_NAME') ? APP_NAME : 'Descloud';
+        $mail->setFrom($_ENV['MAILER_USER'], $appName);
+        $mail->addReplyTo($_ENV['MAILER_USER'], $appName);
 
-        // Użyj portu 25 (standardowy port dla lokalnej wysyłki)
-        $mail->SMTPSecure = false; // Wyłączamy SSL/TLS przy połączeniu lokalnym
+        $mail->SMTPSecure = false;
         $mail->Port       = 25; 
 
-        // Ustawienia SSL są teraz niepotrzebne, ale je zostawiamy,
-        // aby nie generować błędów, jeśli serwer je mimo to sprawdzi.
         $mail->SMTPOptions = [
             'ssl' => [
                 'verify_peer' => false,
@@ -42,19 +37,11 @@ function getMailer(): PHPMailer {
                 'allow_self_signed' => true
             ]
         ];
-        // === KONIEC POPRAWKI ===
-
-        // USUNIĘTO: $mail->isHTML(true); - to jest teraz ustawiane poprawnie w handlerze
-        // w zależności od potrzeb. Domyślnie PHPMailer użyje Plain Text, jeśli isHTML(false).
         
         return $mail;
         
     } catch (Exception $e) {
-        // Zapisz błąd Mailera do logu serwera
         error_log("Błąd konfiguracji Mailera (przy inicjalizacji): {$e->getMessage()}");
-        // Log błędu SMTP jest już zapisywany przez $mail->Debugoutput = 'error_log';
-        
-        // Wyrzucenie wyjątku z informacją, która jest logowana
-        throw new Exception("Nie można skonfigurować serwera pocztowego. Sprawdź plik config/mailer.php i logi serwera.");
+        throw new Exception("Nie można skonfigurować serwera pocztowego. Sprawdź plik .env i logi serwera.");
     }
 }

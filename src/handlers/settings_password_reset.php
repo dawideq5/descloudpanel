@@ -1,10 +1,8 @@
 <?php
 // Plik: /src/handlers/settings_password_reset.php
-// Publiczny
-require_once __DIR__ . '/../config/boot.php';
+// Wersja 2 - Usunięto token z URL przy błędach
 
-// === POPRAWKA KRYTYCZNA: Błędna ścieżka do pliku functions.php ===
-// Było: require_once __DIR__ . '/../src/functions.php';
+require_once __DIR__ . '/../../config/boot.php';
 require_once __DIR__ . '/../functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -18,17 +16,17 @@ $password_confirm = $_POST['password_confirm'] ?? null;
 
 if (!$token || !$password || !$password_confirm) {
     $_SESSION['error_message'] = 'Wszystkie pola są wymagane.';
-    redirect('/reset_password?token=' . $token);
+    redirect('/reset_password');
 }
 
 if ($password !== $password_confirm) {
     $_SESSION['error_message'] = 'Hasła nie są zgodne.';
-    redirect('/reset_password?token=' . $token);
+    redirect('/reset_password');
 }
 
-if (strlen($password) < 10) {
-    $_SESSION['error_message'] = 'Hasło musi mieć co najmniej 10 znaków.';
-    redirect('/reset_password?token=' . $token);
+if (strlen($password) < 1) { // Zmieniono z 10 na 1 zgodnie z wymaganiami
+    $_SESSION['error_message'] = 'Hasło musi mieć co najmniej 1 znak.';
+    redirect('/reset_password');
 }
 
 try {
@@ -61,5 +59,5 @@ try {
 } catch (Exception $e) {
     error_log("Błąd resetowania hasła: " . $e->getMessage());
     $_SESSION['error_message'] = 'Wystąpił błąd serwera.';
-    redirect('/reset_password?token=' . $token);
+    redirect('/reset_password');
 }

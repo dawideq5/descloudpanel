@@ -175,3 +175,31 @@ function generate_username(string $first_name, string $last_name): string {
         $username = $base . '_' . $counter;
     }
 }
+
+/**
+ * Wysyła e-mail przy użyciu szablonu HTML.
+ *
+ * @param string $to Adres e-mail odbiorcy.
+ * @param string $subject Temat wiadomości.
+ * @param string $message Główna treść wiadomości.
+ * @param string|null $button_html Opcjonalny kod HTML dla przycisku akcji.
+ * @return bool True w przypadku sukcesu.
+ * @throws Exception Jeśli szablon nie istnieje lub wysyłka się nie powiedzie.
+ */
+function send_templated_email(string $to, string $subject, string $message, ?string $button_html = null): bool {
+    $template_path = __DIR__ . '/../views/emails/template.php';
+    if (!file_exists($template_path)) {
+        throw new Exception("Nie znaleziono szablonu e-maila: {$template_path}");
+    }
+
+    $template = file_get_contents($template_path);
+
+    $body = str_replace(
+        ['{{TITLE}}', '{{APP_NAME}}', '{{MESSAGE}}', '{{BUTTON}}'],
+        [$subject, APP_NAME, $message, $button_html ?? ''],
+        $template
+    );
+
+    // Wywołanie istniejącej funkcji wysyłającej
+    return send_email($to, $subject, $body);
+}
